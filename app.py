@@ -1,0 +1,59 @@
+from flask import Flask, request, jsonify
+import requests, os, json
+
+app = Flask(__name__)
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ROBLOX_API_KEY = os.getenv("ROBLOX_API_KEY")
+ROBLOX_USER_ID = os.getenv("ROBLOX_USER_ID")
+
+@app.route("/generate", methods=["POST"])
+def generate_and_upload():
+    prompt = request.json.get("prompt", "An openAI generated image")
+    # 1. Generate image using DALL·E 3
+    resp = requests.post(
+        "https://api.openai.com/v1/images/generations",
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "dall-e-3",
+            "prompt": prompt,
+            "n": 1,
+            "size": "1024x1024"
+        }
+    )
+    image_url = resp.json()["data"][0]["url"]
+    image_data = requests.get(image_url).content
+
+    # 2. Save locally
+    with open("image.png", "wb") as f:
+        f.write(image_data)
+
+    # 3. Upload to Roblox Open Cloud
+    with open("image.png", "rb") as f:
+        files = {
+            "fileContent": ("image.png", f, "image/png"),
+            "request": (
+                None,
+                json.dumps({
+                    "assetType": "Decal",
+                    "displayName": "AI Decal",
+                    "description": prompt,
+                    "creationContext": {
+                        "creator": {"userId": int(ROBLOX_USER_ID)}
+                    }
+                }),
+                "application/json"
+            )
+        }
+        roblox_resp = requests.post(
+            "https://apis.roblox.com/assets/v1/assets",
+            headers={"x-api-key": ROBLOX_API_KEY},
+            files=files
+        )
+    data = roblox_resp.json()
+    if roblox_resp.status_code != 200:
+        return jsonify({"error": "upload_failed", "detail": data}), 500
+    return jsonify({"assetId": data.get("assetId")})
