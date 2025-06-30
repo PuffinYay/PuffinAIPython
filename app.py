@@ -3,6 +3,7 @@ import requests, os, json
 
 app = Flask(__name__)
 
+# Get your secrets from environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ROBLOX_API_KEY = os.getenv("ROBLOX_API_KEY")
 ROBLOX_USER_ID = os.getenv("ROBLOX_USER_ID")
@@ -10,8 +11,9 @@ ROBLOX_USER_ID = os.getenv("ROBLOX_USER_ID")
 @app.route("/generate", methods=["POST"])
 def generate_and_upload():
     prompt = request.json.get("prompt", "An OpenAI-generated image")
-    # Generate image from OpenAI
-    response = requests.post(
+
+    # 1. Generate image using OpenAI (DALL·E 3)
+    openai_resp = requests.post(
         "https://api.openai.com/v1/images/generations",
         headers={
             "Authorization": f"Bearer {OPENAI_API_KEY}",
@@ -24,12 +26,19 @@ def generate_and_upload():
             "size": "1024x1024"
         }
     )
-    image_url = response.json()["data"][0]["url"]
+
+    try:
+        image_url = openai_resp.json()["data"][0]["url"]
+    except Exception as e:
+        return jsonify({"error": "Failed to generate image", "detail": str(e), "raw": openai_resp.text}), 500
+
     image_data = requests.get(image_url).content
 
+    # 2. Save the image
     with open("image.png", "wb") as f:
         f.write(image_data)
 
+    # 3. Upload to Roblox Open Cloud
     with open("image.png", "rb") as f:
         files = {
             "fileContent": ("image.png", f, "image/png"),
@@ -40,23 +49,40 @@ def generate_and_upload():
                     "displayName": "AI Decal",
                     "description": prompt,
                     "creationContext": {
-                        "creator": {"userId": int(ROBLOX_USER_ID)}
+                        "creator": {
+                            "userId": int(ROBLOX_USER_ID)
+                        }
                     }
                 }),
                 "application/json"
             )
         }
+
         roblox_resp = requests.post(
             "https://apis.roblox.com/assets/v1/assets",
             headers={"x-api-key": ROBLOX_API_KEY},
             files=files
         )
-    data = roblox_resp.json()
-    if roblox_resp.status_code != 200:
-        return jsonify({"error": "upload_failed", "detail": data}), 500
-    return jsonify({"assetId": data.get("assetId")})
 
-# ✅ This fixes the Render port issue:
+    # 4. Debug: inspect Roblox response
+    try:
+        data = roblox_resp.json()
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to parse Roblox response",
+            "raw": roblox_resp.text
+        }), 500
+
+    print("Roblox response:", data)
+
+    # 5. Return full info for debugging
+    return jsonify({
+        "status": roblox_resp.status_code,
+        "assetId": data.get("assetId"),
+        "robloxResponse": data
+    })
+
+# Required for Render hosting — listen on provided port
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
