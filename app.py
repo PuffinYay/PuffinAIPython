@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
-import requests, os, json
+import requests, os, json, time
 
 app = Flask(__name__)
 
-# Get your secrets from environment variables
+# Environment variables (set these on Render.com)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ROBLOX_API_KEY = os.getenv("ROBLOX_API_KEY")
 ROBLOX_USER_ID = os.getenv("ROBLOX_USER_ID")
@@ -34,11 +34,11 @@ def generate_and_upload():
 
     image_data = requests.get(image_url).content
 
-    # 2. Save the image
+    # 2. Save image to disk
     with open("image.png", "wb") as f:
         f.write(image_data)
 
-    # 3. Upload to Roblox Open Cloud
+    # 3. Upload to Roblox
     with open("image.png", "rb") as f:
         files = {
             "fileContent": ("image.png", f, "image/png"),
@@ -64,25 +64,45 @@ def generate_and_upload():
             files=files
         )
 
-    # 4. Debug: inspect Roblox response
     try:
-        data = roblox_resp.json()
+        upload_data = roblox_resp.json()
+    except:
+        return jsonify({"error": "Roblox upload failed", "raw": roblox_resp.text}), 500
+
+    # Optional delay to allow Roblox to register the asset
+    time.sleep(4)
+
+    # 4. Look up the latest decal asset ID
+    assets_resp = requests.get(
+        "https://apis.roblox.com/assets/v1/assets",
+        headers={"x-api-key": ROBLOX_API_KEY},
+        params={
+            "creatorType": "User",
+            "creatorTargetId": ROBLOX_USER_ID,
+            "assetTypes": "Decal",
+            "limit": 1,
+            "sortOrder": "Desc"
+        }
+    )
+
+    try:
+        assets_data = assets_resp.json()
+        asset_id = assets_data["data"][0]["id"]
     except Exception as e:
         return jsonify({
-            "error": "Failed to parse Roblox response",
-            "raw": roblox_resp.text
+            "error": "Could not find uploaded decal",
+            "uploadResponse": upload_data,
+            "lookupError": str(e),
+            "lookupRaw": assets_resp.text
         }), 500
 
-    print("Roblox response:", data)
-
-    # 5. Return full info for debugging
     return jsonify({
-        "status": roblox_resp.status_code,
-        "assetId": data.get("assetId"),
-        "robloxResponse": data
+        "assetId": asset_id,
+        "displayName": assets_data["data"][0].get("displayName"),
+        "description": assets_data["data"][0].get("description")
     })
 
-# Required for Render hosting — listen on provided port
+# Required for hosting on Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
