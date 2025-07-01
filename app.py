@@ -57,3 +57,6 @@ def generate_and_upload():
     if roblox_resp.status_code != 200:
         return jsonify({"error": "upload_failed", "detail": data}), 500
     return jsonify({"assetId": data.get("assetId")})
+    if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
