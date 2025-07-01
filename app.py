@@ -52,10 +52,10 @@ def generate_and_upload():
             files=files
         )
     data = roblox_resp.json()
-    print (data)
+    
     if roblox_resp.status_code != 200:
         return jsonify({"error": "upload_failed", "detail": data}), 500
-    return jsonify({"assetId": data.get("assetId")})
+    return jsonify(data)
 
 # ✅ This fixes the Render port issue:
 if __name__ == "__main__":
