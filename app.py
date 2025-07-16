@@ -7,7 +7,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ROBLOX_API_KEY = os.getenv("ROBLOX_API_KEY")
 ROBLOX_USER_ID = os.getenv("ROBLOX_USER_ID")
 
-@app.route("/generate", methods=["POST"])
+@app.route("/generate", methods=["POST","GET"])
 def generate_and_upload():
     prompt = request.json.get("prompt", "An OpenAI-generated image")
     # Generate image from OpenAI
