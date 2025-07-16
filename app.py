@@ -62,7 +62,7 @@ def generate_and_upload():
     )
     if roblox_resp2.status_code != 200:
         return jsonify({"error": "upload_failed", "detail": data}), 500
-    return jsonify(roblox_resp2)
+    return roblox_resp2
 
 # ✅ This fixes the Render port issue:
 if __name__ == "__main__":
