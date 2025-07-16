@@ -51,11 +51,18 @@ def generate_and_upload():
             headers={"x-api-key": ROBLOX_API_KEY},
             files=files
         )
-    data = roblox_resp.json()
-    
     if roblox_resp.status_code != 200:
         return jsonify({"error": "upload_failed", "detail": data}), 500
-    return jsonify(data)
+    data = roblox_resp.json()
+    
+    asset_path = data['path']
+    roblox_resp2 = requests.get(
+            "https://apis.roblox.com/assets/v1/"+asset_path,
+            headers={"x-api-key": ROBLOX_API_KEY}
+    )
+    if roblox_resp2.status_code != 200:
+        return jsonify({"error": "upload_failed", "detail": data}), 500
+    return jsonify(roblox_resp2)
 
 # ✅ This fixes the Render port issue:
 if __name__ == "__main__":
