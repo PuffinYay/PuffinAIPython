@@ -64,7 +64,7 @@ def generate_and_upload():
     if not operation_path:
         return jsonify({ "error": "no_operation_path", "details": data }), 500
 
-    operation_url = f"https://apis.roblox.com{operation_path}"
+    operation_url = f"https://apis.roblox.com/assets/v1/{operation_path}"
 
     for attempt in range(10):  # Try for up to 10 seconds
         op_check = requests.get(operation_url, headers={"x-api-key": ROBLOX_API_KEY})
